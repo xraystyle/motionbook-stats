@@ -115,10 +115,45 @@ def find_deviation_links(base_url, offset = 0)
 	
 end
 
+# Log into DA so mature deviations can be parsed.
+def login(user = nil, pass = nil)
+
+	# check for passed creds. If none, ask.
+	username = user if user
+	password = pass if pass
+
+	unless user
+		puts "enter valid DA login creds.\n"
+
+		print "User: "
+		username = STDIN.gets.chomp
+		print "Pass: "
+		password = STDIN.gets.chomp
+	end
+	
+	homepage = @agent.get('http://deviantart.com')
+
+	login_form = homepage.form_with(dom_id: "form-login")
+
+	login_form.field_with(dom_id: "login-username").value = username
+	login_form.field_with(dom_id: "login-password").value = password
+
+	login_form.submit
+
+
+end
+
+
+
+login
 
 find_deviation_links(@starting_url)
 
-puts @deviation_link_list
+puts "Total URLS found: #{@deviation_link_list.count}"
+
+STDIN.gets
+
+puts @deviation_link_list.sort
 
 
 
