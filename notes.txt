@@ -8,3 +8,7 @@ http://www.deviantart.com/motionbooks/?order=9
 
 all deviation links on the page are class "t". Mechanize method link.dom_class will get this attribute.
 
+Make logins work. 
+
+Login has dom ID form-login.
+
