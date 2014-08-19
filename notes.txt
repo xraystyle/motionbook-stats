@@ -1,0 +1,10 @@
+Find all the links to deviation pages for motionbooks.
+
+The links to the deviations are contained in div class "page-results results-page-thumb".
+
+display all motionbooks url: 
+
+http://www.deviantart.com/motionbooks/?order=9
+
+all deviation links on the page are class "t". Mechanize method link.dom_class will get this attribute.
+
