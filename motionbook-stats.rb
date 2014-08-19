@@ -1,4 +1,4 @@
-#!/usr/bin/ruby -w
+#!/usr/bin/ruby 
 system 'clear'
 
 # Check that Mechanize is installed. If not, bail.
@@ -33,7 +33,7 @@ class Motionbook
 		@@motionbooks << self
 
 		@name = name
-		@url = url
+		@deviation_url = url
 		@author = author
 		@views = views
 		@favs = favs
@@ -51,7 +51,7 @@ require 'mechanize'
 
 # What URL are we using? Default to motionbooks, have ability to pull in a 
 # param for later functionality if necessary.
-ARGV[0] ? @url = ARGV[0] : @url = 'http://www.deviantart.com/motionbooks/?order=9'
+ARGV[0] ? @starting_url = ARGV[0] : @starting_url = 'http://www.deviantart.com/motionbooks/?order=9'
 
 # Set up mechanize agent.
 @agent = Mechanize.new
@@ -66,24 +66,59 @@ ARGV[0] ? @url = ARGV[0] : @url = 'http://www.deviantart.com/motionbooks/?order=
 # Method definitions
 
 
-def find_deviation_links(url)
+def find_deviation_links(base_url, offset = 0)
+
+	url = base_url + "&offset=" + offset.to_s
+
+	# puts "getting #{url}. Press enter to continue..."
+
+	# STDIN.gets
 
 	page = @agent.get(url)
 
+	t_links = false
+
+	# puts "URL retrieved, t_links is currently #{t_links.to_s}."
+
+	# puts "Press enter to continue..."
+
+	# STDIN.gets
+
 	page.links.each do |link|
 		if link.dom_class == "t"
-			# do something with the links.
-			# add offset param, get more "t" links.
-			# if no "t" links, bail.
+
+			# puts "t_link found: #{link}"
+			# puts "Press enter to add to list and continue..."
+			# STDIN.gets
+			@deviation_link_list << link.href
+
+			t_links = true
 		end
+	end
+
+	if t_links == true
+		
+		# puts "t_links is true, restarting method with these params:"
+
+		offset += 24
+
+		# puts "base_url: #{base_url}, offset: #{offset}"
+
+		# puts "Press enter to continue..."
+
+		# # STDIN.gets
+
+		find_deviation_links(base_url, offset)
+		
 	end
 
 	
 end
 
 
+find_deviation_links(@starting_url)
 
-
+puts @deviation_link_list
 
 
 
