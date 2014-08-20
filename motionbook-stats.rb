@@ -65,7 +65,35 @@ ARGV[0] ? @starting_url = ARGV[0] : @starting_url = 'http://www.deviantart.com/m
 
 # Method definitions
 
+# Log into DA so mature deviations can be parsed.
+def login(user = nil, pass = nil)
 
+	# check for passed creds. If none, ask.
+	username = user if user
+	password = pass if pass
+
+	unless user
+		puts "\nEnter valid DA login creds.\n"
+
+		print "User: "
+		username = STDIN.gets.chomp
+		print "Pass: "
+		password = STDIN.gets.chomp
+	end
+	
+	homepage = @agent.get('http://deviantart.com')
+
+	login_form = homepage.form_with(dom_id: "form-login")
+
+	login_form.field_with(dom_id: "login-username").value = username
+	login_form.field_with(dom_id: "login-password").value = password
+
+	login_form.submit
+
+
+end
+
+# Get all the links to deviations within the motionbooks category.
 def find_deviation_links(base_url, offset = 0)
 
 	url = base_url + "&offset=" + offset.to_s
@@ -88,9 +116,10 @@ def find_deviation_links(base_url, offset = 0)
 		if link.dom_class == "t"
 
 			# puts "t_link found: #{link}"
+			# puts link.text
 			# puts "Press enter to add to list and continue..."
 			# STDIN.gets
-			@deviation_link_list << link.href
+			@deviation_link_list << link
 
 			t_links = true
 		end
@@ -115,45 +144,120 @@ def find_deviation_links(base_url, offset = 0)
 	
 end
 
-# Log into DA so mature deviations can be parsed.
-def login(user = nil, pass = nil)
+# pull the stats from the deviation pages and put together Motionbook instances
+# with the relevant data.
+def get_deviation_stats
 
-	# check for passed creds. If none, ask.
-	username = user if user
-	password = pass if pass
-
-	unless user
-		puts "enter valid DA login creds.\n"
-
-		print "User: "
-		username = STDIN.gets.chomp
-		print "Pass: "
-		password = STDIN.gets.chomp
+	# Handle potential errors.
+	unless @deviation_link_list.any?
+		puts "No deviations in list to get stats from, exiting."
+		exit 1		
 	end
+
+	spinner = ['|', '/', '-', "\\"]
+	spinner_position = 0 		
 	
-	homepage = @agent.get('http://deviantart.com')
+	@deviation_link_list.each do |link|
 
-	login_form = homepage.form_with(dom_id: "form-login")
+		begin
 
-	login_form.field_with(dom_id: "login-username").value = username
-	login_form.field_with(dom_id: "login-password").value = password
+			system 'clear'
 
-	login_form.submit
+			print "Working... #{spinner[spinner_position]}\n\n"        
+			# empty array to hold the data we want from the 'dd' tags.
+			dd_values = []
+
+			deviation_page = @agent.get(link.href)
+
+			author = deviation_page.link_with(dom_class: "u beta username").text
+
+			# find the div that contains the deviation stats.
+			stats_div = deviation_page.search('.dev-metainfo-stats')
+			# Find all the descriptions within the div. This will be the relevant info.
+			dds = stats_div.search('dd')
+
+			# Shit the values of the dd tags into an array for cleanup.
+			dds.each do |d|
+		    	dd_values << d.content.chomp.strip
+		 	end
+
+		 	# let's get some nicely formatted data.
+		 	views = dd_values[0].match(/([0-9,]+) ?\(?/)[1].gsub(/,/, "")
+
+		 	favs = dd_values[1].match(/([0-9,]+) ?\(?/)[1].gsub(/,/, "")
+
+		 	comments = dd_values[2].to_s.gsub(/,/, "")
+
+		 	# Make a new Motionbook instance with our lovely data.
+		 	# Template: Motionbook.new(name, url, author, views, favs, comments)
+
+		 	book = Motionbook.new(link.text, link.href, author, views, favs, comments)
+
+		 	if spinner_position == 3
+		 		spinner_position = 0
+		 	else
+		 		spinner_position += 1
+		 	end
+
+	 	rescue Exception => e
+	 		puts "Something went sideways..."
+	 		puts e
+	 		puts "Press enter to continue..."
+	 		STDIN.gets
+		end
+
+
+	end
+
 
 
 end
 
 
 
+puts "Motionbooks Stats Reporter"
+
 login
+
+puts "\nFinding all deviations within the category...\n"
 
 find_deviation_links(@starting_url)
 
-puts "Total URLS found: #{@deviation_link_list.count}"
+puts "Found #{@deviation_link_list.count} deviations."
+puts "Begining Stats parsing..."
 
-STDIN.gets
+sleep 3
 
-puts @deviation_link_list.sort
+get_deviation_stats
+
+puts "Preparing detailed deviation stats..."
+
+sleep 3
+
+system 'clear'
+
+print "Book Name".ljust(50)
+print "Book Author".ljust(25)
+print "Views".ljust(10)
+print "Favs".ljust(10)
+print "Comments".ljust(10)
+puts
+puts
+
+Motionbook.all.each do |book|
+
+	print book.name.ljust(50)
+	print book.author.ljust(25)
+	print book.views.ljust(10)
+	print book.favs.ljust(10)
+	print book.comments.ljust(10)
+	puts
+	puts
+end
+
+
+
+
 
 
 
