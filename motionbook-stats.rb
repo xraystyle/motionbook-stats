@@ -41,6 +41,20 @@ class Motionbook
 		
 	end
 
+	def make_array
+
+		array = []
+		# ["Name", "Author", "URL", "Views", "Favs", "Comments"]
+		array << @name
+		array << @author
+		array << @deviation_url
+		array << @views
+		array << @favs
+		array << @comments
+		return array
+		
+	end
+
 # ----------------------------------
 
 end
@@ -48,6 +62,7 @@ end
 
 # Useful variables/things that need to be set up.
 require 'mechanize'
+require 'csv'
 
 # What URL are we using? Default to motionbooks, have ability to pull in a 
 # param for later functionality if necessary.
@@ -155,11 +170,14 @@ def get_deviation_stats
 	end
 
 	spinner = ['|', '/', '-', "\\"]
-	spinner_position = 0 		
-	
+	spinner_position = 0 
+	# use counter to limit number of books for debugging purposes.
+	# counter = 0
 	@deviation_link_list.each do |link|
 
 		begin
+
+			# break if counter == 20
 
 			system 'clear'
 
@@ -192,6 +210,9 @@ def get_deviation_stats
 		 	# Template: Motionbook.new(name, url, author, views, favs, comments)
 
 		 	book = Motionbook.new(link.text, link.href, author, views, favs, comments)
+
+		 	# use counter to limit number of books for debugging purposes.
+		 	# counter += 1
 
 		 	if spinner_position == 3
 		 		spinner_position = 0
@@ -234,29 +255,43 @@ puts "Preparing detailed deviation stats..."
 
 sleep 3
 
-system 'clear'
+# system 'clear'
 
-print "Book Name".ljust(50)
-print "Book Author".ljust(25)
-print "Views".ljust(10)
-print "Favs".ljust(10)
-print "Comments".ljust(10)
-puts
-puts
+# print "Book Name".ljust(50)
+# print "Book Author".ljust(25)
+# print "Views".ljust(10)
+# print "Favs".ljust(10)
+# print "Comments".ljust(10)
+# puts
+# puts
 
-Motionbook.all.each do |book|
+# Motionbook.all.each do |book|
 
-	print book.name.ljust(50)
-	print book.author.ljust(25)
-	print book.views.ljust(10)
-	print book.favs.ljust(10)
-	print book.comments.ljust(10)
-	puts
-	puts
+# 	print book.name.ljust(50)
+# 	print book.author.ljust(25)
+# 	print book.views.ljust(10)
+# 	print book.favs.ljust(10)
+# 	print book.comments.ljust(10)
+# 	puts
+# 	puts
+# end
+
+CSV.open(File.expand_path("~/Desktop/motionbook_stats.csv"), "wb") do |csv|
+	# Template: Motionbook.new(name, url, author, views, favs, comments)
+
+	csv << ["Name", "Author", "URL", "Views", "Favs", "Comments"]
+	
+	Motionbook.all.each do |book|
+
+		csv << book.make_array
+
+	end
+
 end
 
+puts "CSV file with all data has been saved to the desktop.\n\n"
 
-
+exit 0
 
 
 
