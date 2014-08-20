@@ -12,3 +12,48 @@ Make logins work.
 
 Login has dom ID form-login.
 
+
+
+FIND THE STATS
+
+First, find the div. 
+
+	div = d_page.search('.dev-metainfo-stats')
+
+
+
+
+Then find the dd tags.
+
+	dds = div.search('dd')
+
+
+
+
+
+Once we have these, shit the content into an array which we can clean up.
+
+
+	dds.each do |d|
+	    values << d.content.chomp.strip
+	 end
+
+
+
+
+Clean up the data in the array.
+
+	views = values[0].match(/([0-9,]+) \(/)[1].gsub(/,/, "")
+
+	favs = values[0].match(/([0-9,]+) \(/)[1].gsub(/,/, "")
+
+	comments = values[2]
+
+
+Found the bug. Regex assumes the presence of (\d Today) in the Views and Favs dd_values array. NOT ALWAYS THERE! Check for the "(" 0 or 1 times in the regex.
+
+this: .match(/([0-9,]+) ?\(?/)[1].gsub(/,/, "")
+
+|/-\
+
+
