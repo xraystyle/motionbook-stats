@@ -1,0 +1,8 @@
+DeviantArt Motionbook Stats
+
+This app is another web scraping exercise done with Ruby and the Mechanize gem. This app will search for all the submissions in the Motionbooks category on DeviantArt, read how many pageviews each has, how many comments, and how many times a user has favorited the work. This data is then compiled on a per-book basis and output as a CSV file on the user's desktop.
+
+The app can also take a different category URL as an argument, but I haven't really fleshed out the code enough to make that useful.
+
+Tested working on a Mac running Mavericks. Should work on *NIX, dunno about Windows. I don't use it nor develop for it. App requires a valid DeviantArt account in order to be able to parse art marked with the mature content tag.
+
