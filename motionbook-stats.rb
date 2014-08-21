@@ -176,8 +176,9 @@ def get_deviation_stats
 	@deviation_link_list.each do |link|
 
 		begin
-
-			# break if counter == 20
+		 	
+		 	# use counter to limit number of books for debugging purposes.
+			# break if counter == 50
 
 			system 'clear'
 
