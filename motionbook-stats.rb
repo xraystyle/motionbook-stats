@@ -41,6 +41,7 @@ class Motionbook
 		
 	end
 
+	# Make a nice array for the CSV output.
 	def make_array
 
 		array = []
@@ -113,49 +114,29 @@ def find_deviation_links(base_url, offset = 0)
 
 	url = base_url + "&offset=" + offset.to_s
 
-	# puts "getting #{url}. Press enter to continue..."
-
-	# STDIN.gets
-
 	page = @agent.get(url)
 
 	t_links = false
-
-	# puts "URL retrieved, t_links is currently #{t_links.to_s}."
-
-	# puts "Press enter to continue..."
-
-	# STDIN.gets
-
+	# We're looking for links with dom class 't'.
+	# They're the links to the deviation pages, and also the deviation titles.
 	page.links.each do |link|
 		if link.dom_class == "t"
-
-			# puts "t_link found: #{link}"
-			# puts link.text
-			# puts "Press enter to add to list and continue..."
-			# STDIN.gets
+			# if we find any, add them to the list, and set t_links to true.
+			# This starts the next recursive run of the method.
 			@deviation_link_list << link
-
 			t_links = true
+
 		end
 	end
 
 	if t_links == true
 		
-		# puts "t_links is true, restarting method with these params:"
-
 		offset += 24
-
-		# puts "base_url: #{base_url}, offset: #{offset}"
-
-		# puts "Press enter to continue..."
-
-		# # STDIN.gets
-
 		find_deviation_links(base_url, offset)
-		
+		# if t_links is false here, it's because we didn't
+		# find any on the page. We've reached the last page 
+		# of links.
 	end
-
 	
 end
 
@@ -169,6 +150,7 @@ def get_deviation_stats
 		exit 1		
 	end
 
+	# Spinners are fun to look at.
 	spinner = ['|', '/', '-', "\\"]
 	spinner_position = 0 
 	# use counter to limit number of books for debugging purposes.
@@ -215,6 +197,7 @@ def get_deviation_stats
 		 	# use counter to limit number of books for debugging purposes.
 		 	# counter += 1
 
+		 	# update the spinner position for the next run of the loop.
 		 	if spinner_position == 3
 		 		spinner_position = 0
 		 	else
@@ -256,26 +239,6 @@ puts "Preparing detailed deviation stats..."
 
 sleep 3
 
-# system 'clear'
-
-# print "Book Name".ljust(50)
-# print "Book Author".ljust(25)
-# print "Views".ljust(10)
-# print "Favs".ljust(10)
-# print "Comments".ljust(10)
-# puts
-# puts
-
-# Motionbook.all.each do |book|
-
-# 	print book.name.ljust(50)
-# 	print book.author.ljust(25)
-# 	print book.views.ljust(10)
-# 	print book.favs.ljust(10)
-# 	print book.comments.ljust(10)
-# 	puts
-# 	puts
-# end
 
 CSV.open(File.expand_path("~/Desktop/motionbook_stats.csv"), "wb") do |csv|
 	# Template: Motionbook.new(name, url, author, views, favs, comments)
