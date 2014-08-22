@@ -154,13 +154,13 @@ def get_deviation_stats
 	spinner = ['|', '/', '-', "\\"]
 	spinner_position = 0 
 	# use counter to limit number of books for debugging purposes.
-	counter = 0
+	# counter = 0
 	@deviation_link_list.each do |link|
 
 		begin
 		 	
 		 	# use counter to limit number of books for debugging purposes.
-			break if counter == 50
+			# break if counter == 50
 
 			system 'clear'
 
@@ -207,7 +207,7 @@ def get_deviation_stats
 		 	book = Motionbook.new(link.text, link.href, author, views, favs, comments)
 
 		 	# use counter to limit number of books for debugging purposes.
-		 	counter += 1
+		 	# counter += 1
 
 		 	# update the spinner position for the next run of the loop.
 		 	if spinner_position == 3
