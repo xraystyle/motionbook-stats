@@ -74,6 +74,7 @@ ARGV[0] ? @starting_url = ARGV[0] : @starting_url = 'http://www.deviantart.com/m
 
 # List that will contain all the links to the deviations in the motionbooks category.
 @deviation_link_list = []
+@book_errors_list = []
 
 
 
@@ -217,10 +218,13 @@ def get_deviation_stats
 		 	end
 
 	 	rescue Exception => e
-	 		puts "Something went sideways..."
-	 		puts e
-	 		puts "Press enter to continue..."
-	 		STDIN.gets
+
+	 		@book_errors_list << link
+
+	 		# puts "Something went sideways on book #{link.text}..."
+	 		# puts e
+	 		# puts "Press enter to continue..."
+	 		# STDIN.gets
 		end
 
 
@@ -266,6 +270,14 @@ CSV.open(File.expand_path("~/Desktop/motionbook_stats.csv"), "wb") do |csv|
 end
 
 puts "CSV file with all data has been saved to the desktop.\n\n"
+
+if @book_errors_list.any?
+	puts "There were errors processing the following books:\n"
+	@book_errors_list.each do |book|
+		puts book.text + ", " + book.href
+	end
+end
+
 
 exit 0
 
