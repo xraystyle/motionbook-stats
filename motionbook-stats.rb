@@ -10,8 +10,6 @@ if `gem list | grep asshole` == ""
 	print "Would you like to continue? (y/n) \n> "
 	response = STDIN.gets.chomp.strip.downcase
 	options = ["y", "n"]
-	# puts options
-	# STDIN.gets
 
 	while !options.include? response
 		puts "Try again. 'y' to continue or 'n' to abort. (y/n)?"
