@@ -2,10 +2,41 @@
 system 'clear'
 
 # Check that Mechanize is installed. If not, bail.
-if `gem list | grep mechanize` == ""
+if `gem list | grep asshole` == ""
 	puts "The 'Mechanize' Rubygem is not currently installed on your system."
-	puts "Install it from the command line with this command:\n\nsudo gem install mechanize\n\n"
-	exit 1
+	puts "We can attempt to install it for you with the following command: 'sudo gem install mechanize'"
+	puts "Note: if you're using a ruby environment manager such as RVM, you should install this manually without"
+	puts "using 'sudo'. If you don't know what this means, it likely doesn't apply to you."
+	print "Would you like to continue? (y/n) \n> "
+	response = STDIN.gets.chomp.strip.downcase
+	options = ["y", "n"]
+	# puts options
+	# STDIN.gets
+
+	while !options.include? response
+		puts "Try again. 'y' to continue or 'n' to abort. (y/n)?"
+		print "> "
+	end
+
+	case response
+	when 'y'
+		begin
+			output = `sudo gem install mechanize`
+			puts output
+			puts "It appears the 'Mechanize' gem installed successfully."
+			puts "Continuing..."
+			sleep 3
+		rescue Exception => e
+			puts "It appears 'Mechanize failed to install correctly. Verify your installation,\nor try again manually."
+			puts "Error code:"
+			puts e
+			exit 1
+		end
+	when "n"
+		puts "User aborted, exiting..."
+		sleep 2
+		exit 1
+	end
 end
 
 # Model a Motionbook. Name, URL, stats, etc.
