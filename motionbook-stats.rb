@@ -2,7 +2,7 @@
 system 'clear'
 
 # Check that Mechanize is installed. If not, bail.
-if `gem list | grep asshole` == ""
+if `gem list | grep mechanize` == ""
 	puts "The 'Mechanize' Rubygem is not currently installed on your system."
 	puts "We can attempt to install it for you with the following command: 'sudo gem install mechanize'"
 	puts "Note: if you're using a ruby environment manager such as RVM, you should install this manually without"
