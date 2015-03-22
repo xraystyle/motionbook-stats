@@ -155,19 +155,16 @@ def find_deviation_links(base_url, offset = 0)
 			# This starts the next recursive run of the method.
 			@deviation_link_list << link
 			t_links = true
-
 		end
 	end
 
 	if t_links == true
-		
 		offset += 24
 		find_deviation_links(base_url, offset)
 		# if t_links is false here, it's because we didn't
 		# find any on the page. We've reached the last page 
 		# of links.
 	end
-	
 end
 
 # pull the stats from the deviation pages and put together Motionbook instances
@@ -191,7 +188,6 @@ def get_deviation_stats
 		 	
 		 	# use counter to limit number of books for debugging purposes.
 			# break if counter == 50
-
 			system 'clear'
 
 			print "Working... #{spinner[spinner_position]}\n\n"        
@@ -200,25 +196,14 @@ def get_deviation_stats
 
 			deviation_page = @agent.get(link.href)
 
-			# puts link.text
-
-			# STDIN.gets
-
-			# author = deviation_page.link_with(dom_class: "u beta username").text
-
-			# puts deviation_page.link_with(dom_class: %r{u.*username.*})
-
-			# STDIN.gets
-
 			author = deviation_page.link_with(dom_class: %r{u.*username.*}).text
-
 
 			# find the div that contains the deviation stats.
 			stats_div = deviation_page.search('.dev-metainfo-stats')
 			# Find all the descriptions within the div. This will be the relevant info.
 			dds = stats_div.search('dd')
 
-			# Shit the values of the dd tags into an array for cleanup.
+			# Put the values of the dd tags into an array for cleanup.
 			dds.each do |d|
 		    	dd_values << d.content.chomp.strip
 		 	end
@@ -247,24 +232,14 @@ def get_deviation_stats
 		 	end
 
 	 	rescue Exception => e
-
 	 		@book_errors_list << link
-
-	 		# puts "Something went sideways on book #{link.text}..."
-	 		# puts e
-	 		# puts "Press enter to continue..."
-	 		# STDIN.gets
 		end
-
 
 	end
 
-
-
 end
 
-
-
+#  Begin script -----------------------------------
 puts "Motionbooks Stats Reporter"
 
 login
@@ -283,7 +258,6 @@ get_deviation_stats
 puts "Preparing detailed deviation stats..."
 
 sleep 3
-
 
 CSV.open(File.expand_path("~/Desktop/motionbook_stats.csv"), "wb") do |csv|
 	# Template: Motionbook.new(name, url, author, views, favs, comments)
@@ -307,28 +281,5 @@ if @book_errors_list.any?
 	end
 end
 
-
 exit 0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
