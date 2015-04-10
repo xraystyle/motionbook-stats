@@ -101,7 +101,7 @@ end
 # Useful variables/things that need to be set up.
 require 'mechanize'
 require 'csv'
-require 'thwait'
+# require 'thwait'
 
 # What URL are we using? Default to motionbooks, have ability to pull in a 
 # param for later functionality if necessary.
@@ -169,12 +169,22 @@ end
 #start a thread that will retrieve data for a motionbook deviation.
 def start_thread(link)
 	
-	@threads << Thread.new do
-		agent = Mechanize.new
-		login(@username, @password, agent)
-		retrieve_motionbook(link, agent)
-	end
+	if Thread.list.count < 20
+		# puts "Starting thread...\n\n"
+		t = Thread.new do
+			agent = Mechanize.new
+			login(@username, @password, agent)
+			retrieve_motionbook(link, agent)
+			@finished_book_count += 1
+		end
+		# t.join
+		@threads << t
+		return t
 
+	else
+		# puts "Thread start failed...\n\n"
+		return false
+	end
 
 end
 
@@ -185,10 +195,12 @@ end
 def retrieve_motionbook(link, mechanize_agent)
 
 	begin
-	 	
+	 	# puts "starting book retrieval.\n\n"
 		dd_values = []
 
 		deviation_page = mechanize_agent.get(link.href)
+
+		puts "Book #{link.text} retrieved, processing...\n\n"
 
 		author = deviation_page.link_with(dom_class: %r{u.*username.*}).text
 
@@ -214,6 +226,8 @@ def retrieve_motionbook(link, mechanize_agent)
 	 	# puts "Building the motionbook..."
 	 	# STDIN.gets
 	 	book = Motionbook.new(link.text, link.href, author, views, favs, comments)
+
+	 	puts "Motionbook built: #{book.name}\n\n"
 
 	 	# use counter to limit number of books for debugging purposes.
 	 	# counter += 1
@@ -241,9 +255,12 @@ end
 # List that will contain all the links to the deviations in the motionbooks category.
 @deviation_link_list = []
 @book_errors_list = []
+@finished_book_count = 0
 
 # List of all the running threads, so we can wait for them to finish.
 @threads = []
+
+Thread.abort_on_exception = true
 
 
 
@@ -275,9 +292,51 @@ unless @deviation_link_list.any?
 	exit 1		
 end
 
-@deviation_link_list.each do |link|
-	start_thread(link)
+
+loop = Thread.new do
+	@deviation_link_list.each_with_index do |link, index|
+		# redo until start_thread(link) == true
+		next if index > 200
+		thread = start_thread(link)
+		redo if thread == false
+		# thread.join
+		# puts "Current threads: #{Thread.list}"
+		# puts "Books retrieved so far: #{@finished_book_count}"
+
+	end
 end
+
+loop.join
+	
+
+@threads.each { |t| t.join }
+
+# wait til all threads are finished, give the user something to look at in the meantime.
+
+# ThreadsWait.all_waits(*@threads)
+
+# spinner = ['|', '/', '-', "\\"]
+# spinner_position = 0 
+
+# while Thread.list.count > 1
+	# system 'clear'
+	# print "Working... #{spinner[spinner_position]}\n\n"
+
+	# if spinner_position == 3
+	#     spinner_position = 0
+	# else
+	#     spinner_position += 1
+	# end
+
+	# sleep 0.3
+	# system 'clear'
+	# puts "Current threads: #{Thread.list}"
+	# puts
+	# puts "Books retrieved so far: #{@finished_book_count}"
+	# # puts "Threads array: #{@threads}"
+	# sleep 2
+# end
+
 
 
 puts "Preparing detailed deviation stats..."
