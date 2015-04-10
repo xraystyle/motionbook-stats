@@ -1,6 +1,9 @@
 #!/usr/bin/ruby 
 system 'clear'
 
+
+# ----------------- Startup Boilerplate ------------------------
+
 # Check that Mechanize is installed. If not, bail.
 if `gem list | grep mechanize` == ""
 	puts "The 'Mechanize' Rubygem is not currently installed on your system."
@@ -37,10 +40,15 @@ if `gem list | grep mechanize` == ""
 	end
 end
 
+
+# ----------------- End Startup Boilerplate ------------------------
+
+
+
 # Model a Motionbook. Name, URL, stats, etc.
 class Motionbook
 
-# Class methods/variables ------
+	# Class methods/variables ------
 
 	@@motionbooks = []
 
@@ -50,9 +58,9 @@ class Motionbook
 		@@motionbooks
 	
 	end
-# --------------------------------
+	# --------------------------------
 
-# Instance methods/variables -------
+	# Instance methods/variables -------
 
 	attr_reader :name, :url, :author, :views, :favs, :comments
 
@@ -85,7 +93,7 @@ class Motionbook
 		
 	end
 
-# ----------------------------------
+	# ----------------------------------
 
 end
 
@@ -93,46 +101,37 @@ end
 # Useful variables/things that need to be set up.
 require 'mechanize'
 require 'csv'
+require 'thwait'
 
 # What URL are we using? Default to motionbooks, have ability to pull in a 
 # param for later functionality if necessary.
 ARGV[0] ? @starting_url = ARGV[0] : @starting_url = 'http://www.deviantart.com/motionbooks/?order=9'
 
-# Set up mechanize agent.
-@agent = Mechanize.new
-
-# List that will contain all the links to the deviations in the motionbooks category.
-@deviation_link_list = []
-@book_errors_list = []
-
-
-
-
 
 # Method definitions
 
 # Log into DA so mature deviations can be parsed.
-def login(user = nil, pass = nil)
+def login(user, pass, mechanize_agent)
 
 	# check for passed creds. If none, ask.
-	username = user if user
-	password = pass if pass
+	# username = user if user
+	# password = pass if pass
 
-	unless user
-		puts "\nEnter valid DA login creds.\n"
+	# unless user
+	# 	puts "\nEnter valid DA login creds.\n"
 
-		print "User: "
-		username = STDIN.gets.chomp
-		print "Pass: "
-		password = STDIN.gets.chomp
-	end
+	# 	print "User: "
+	# 	username = STDIN.gets.chomp
+	# 	print "Pass: "
+	# 	password = STDIN.gets.chomp
+	# end
 	
-	homepage = @agent.get('http://deviantart.com')
+	homepage = mechanize_agent.get('http://deviantart.com')
 
 	login_form = homepage.form_with(dom_id: "form-login")
 
-	login_form.field_with(dom_id: "login-username").value = username
-	login_form.field_with(dom_id: "login-password").value = password
+	login_form.field_with(dom_id: "login-username").value = user
+	login_form.field_with(dom_id: "login-password").value = pass
 
 	login_form.submit
 
@@ -144,7 +143,7 @@ def find_deviation_links(base_url, offset = 0)
 
 	url = base_url + "&offset=" + offset.to_s
 
-	page = @agent.get(url)
+	page = @book_list_agent.get(url)
 
 	t_links = false
 	# We're looking for links with dom class 't'.
@@ -167,82 +166,97 @@ def find_deviation_links(base_url, offset = 0)
 	end
 end
 
-# pull the stats from the deviation pages and put together Motionbook instances
-# with the relevant data.
-def get_deviation_stats
-
-	# Handle potential errors.
-	unless @deviation_link_list.any?
-		puts "No deviations in list to get stats from, exiting."
-		exit 1		
+#start a thread that will retrieve data for a motionbook deviation.
+def start_thread(link)
+	
+	@threads << Thread.new do
+		agent = Mechanize.new
+		login(@username, @password, agent)
+		retrieve_motionbook(link, agent)
 	end
 
-	# Spinners are fun to look at.
-	spinner = ['|', '/', '-', "\\"]
-	spinner_position = 0 
-	# use counter to limit number of books for debugging purposes.
-	# counter = 0
-	@deviation_link_list.each do |link|
 
-		begin
-		 	
-		 	# use counter to limit number of books for debugging purposes.
-			# break if counter == 50
-			system 'clear'
+end
 
-			print "Working... #{spinner[spinner_position]}\n\n"        
-			# empty array to hold the data we want from the 'dd' tags.
-			dd_values = []
 
-			deviation_page = @agent.get(link.href)
 
-			author = deviation_page.link_with(dom_class: %r{u.*username.*}).text
+# retrieve the individual motionbook page, use the stats to make a 
+# motionbook instance.
+def retrieve_motionbook(link, mechanize_agent)
 
-			# find the div that contains the deviation stats.
-			stats_div = deviation_page.search('.dev-metainfo-stats')
-			# Find all the descriptions within the div. This will be the relevant info.
-			dds = stats_div.search('dd')
+	begin
+	 	
+		dd_values = []
 
-			# Put the values of the dd tags into an array for cleanup.
-			dds.each do |d|
-		    	dd_values << d.content.chomp.strip
-		 	end
+		deviation_page = mechanize_agent.get(link.href)
 
-		 	# let's get some nicely formatted data.
-		 	views = dd_values[0].match(/([0-9,]+) ?\(?/)[1].gsub(/,/, "")
+		author = deviation_page.link_with(dom_class: %r{u.*username.*}).text
 
-		 	favs = dd_values[1].match(/([0-9,]+) ?\(?/)[1].gsub(/,/, "")
+		# find the div that contains the deviation stats.
+		stats_div = deviation_page.search('.dev-metainfo-stats')
+		# Find all the descriptions within the div. This will be the relevant info.
+		dds = stats_div.search('dd')
 
-		 	comments = dd_values[2].to_s.gsub(/,/, "")
+		# Put the values of the dd tags into an array for cleanup.
+		dds.each do |d|
+	    	dd_values << d.content.chomp.strip
+	 	end
 
-		 	# Make a new Motionbook instance with our lovely data.
-		 	# Template: Motionbook.new(name, url, author, views, favs, comments)
-		 	# puts "Building the motionbook..."
-		 	# STDIN.gets
-		 	book = Motionbook.new(link.text, link.href, author, views, favs, comments)
+	 	# let's get some nicely formatted data.
+	 	views = dd_values[0].match(/([0-9,]+) ?\(?/)[1].gsub(/,/, "")
 
-		 	# use counter to limit number of books for debugging purposes.
-		 	# counter += 1
+	 	favs = dd_values[1].match(/([0-9,]+) ?\(?/)[1].gsub(/,/, "")
 
-		 	# update the spinner position for the next run of the loop.
-		 	if spinner_position == 3
-		 		spinner_position = 0
-		 	else
-		 		spinner_position += 1
-		 	end
+	 	comments = dd_values[2].to_s.gsub(/,/, "")
 
-	 	rescue Exception => e
-	 		@book_errors_list << link
-		end
+	 	# Make a new Motionbook instance with our lovely data.
+	 	# Template: Motionbook.new(name, url, author, views, favs, comments)
+	 	# puts "Building the motionbook..."
+	 	# STDIN.gets
+	 	book = Motionbook.new(link.text, link.href, author, views, favs, comments)
 
+	 	# use counter to limit number of books for debugging purposes.
+	 	# counter += 1
+
+	 	# update the spinner position for the next run of the loop.
+	 	# if spinner_position == 3
+	 	# 	spinner_position = 0
+	 	# else
+	 	# 	spinner_position += 1
+	 	# end
+
+ 	rescue Exception => e
+ 		@book_errors_list << link
 	end
 
 end
 
+
+
 #  Begin script -----------------------------------
+
+# Set up mechanize agent to get the list of all books.
+@book_list_agent = Mechanize.new
+
+# List that will contain all the links to the deviations in the motionbooks category.
+@deviation_link_list = []
+@book_errors_list = []
+
+# List of all the running threads, so we can wait for them to finish.
+@threads = []
+
+
+
 puts "Motionbooks Stats Reporter"
 
-login
+puts "\nEnter valid DA login creds.\n"
+
+print "User: "
+@username = STDIN.gets.chomp
+print "Pass: "
+@password = STDIN.gets.chomp
+
+login(@username, @password, @book_list_agent)
 
 puts "\nFinding all deviations within the category...\n"
 
@@ -253,7 +267,18 @@ puts "Begining Stats parsing..."
 
 sleep 3
 
-get_deviation_stats
+# get_deviation_stats
+
+# Handle potential errors.
+unless @deviation_link_list.any?
+	puts "No deviations in list to get stats from, exiting."
+	exit 1		
+end
+
+@deviation_link_list.each do |link|
+	start_thread(link)
+end
+
 
 puts "Preparing detailed deviation stats..."
 
