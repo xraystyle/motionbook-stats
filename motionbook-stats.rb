@@ -101,7 +101,6 @@ end
 # Useful variables/things that need to be set up.
 require 'mechanize'
 require 'csv'
-# require 'thwait'
 
 # What URL are we using? Default to motionbooks, have ability to pull in a 
 # param for later functionality if necessary.
@@ -113,28 +112,26 @@ ARGV[0] ? @starting_url = ARGV[0] : @starting_url = 'http://www.deviantart.com/m
 # Log into DA so mature deviations can be parsed.
 def login(user, pass, mechanize_agent)
 
-	# check for passed creds. If none, ask.
-	# username = user if user
-	# password = pass if pass
+	tries = 0
+	begin	
+		homepage = mechanize_agent.get('http://deviantart.com')
 
-	# unless user
-	# 	puts "\nEnter valid DA login creds.\n"
+		login_form = homepage.form_with(dom_id: "form-login")
 
-	# 	print "User: "
-	# 	username = STDIN.gets.chomp
-	# 	print "Pass: "
-	# 	password = STDIN.gets.chomp
-	# end
-	
-	homepage = mechanize_agent.get('http://deviantart.com')
+		login_form.field_with(dom_id: "login-username").value = user
+		login_form.field_with(dom_id: "login-password").value = pass
 
-	login_form = homepage.form_with(dom_id: "form-login")
-
-	login_form.field_with(dom_id: "login-username").value = user
-	login_form.field_with(dom_id: "login-password").value = pass
-
-	login_form.submit
-
+		login_form.submit
+	rescue
+		puts "Login error. retrying..."
+		tries += 1
+		if tries < 3
+			sleep (2 ** tries)
+			retry
+		else 
+			puts "Tried three times, bailing."
+		end
+	end
 
 end
 
@@ -169,20 +166,19 @@ end
 #start a thread that will retrieve data for a motionbook deviation.
 def start_thread(link)
 	
-	if Thread.list.count < 20
-		# puts "Starting thread...\n\n"
+	if Thread.list.count < 30
+
 		t = Thread.new do
 			agent = Mechanize.new
 			login(@username, @password, agent)
 			retrieve_motionbook(link, agent)
-			@finished_book_count += 1
 		end
-		# t.join
+
 		@threads << t
+
 		return t
 
 	else
-		# puts "Thread start failed...\n\n"
 		return false
 	end
 
@@ -193,13 +189,29 @@ end
 # retrieve the individual motionbook page, use the stats to make a 
 # motionbook instance.
 def retrieve_motionbook(link, mechanize_agent)
-
+	tries = 0
 	begin
-	 	# puts "starting book retrieval.\n\n"
 		dd_values = []
 
 		deviation_page = mechanize_agent.get(link.href)
 
+ 	rescue Exception => e
+ 		
+ 		puts "Error processing book #{link.text}, retrying..."
+ 		if tries < 5
+ 			sleep (2 ** tries)
+ 			tries +=1
+ 			retry
+ 		else
+ 			puts "Tried three times, giving up."
+ 			@book_errors_list << link
+ 			return
+ 		end
+
+	end
+
+	begin
+		# Process the URL.
 		puts "Book #{link.text} retrieved, processing...\n\n"
 
 		author = deviation_page.link_with(dom_class: %r{u.*username.*}).text
@@ -223,31 +235,19 @@ def retrieve_motionbook(link, mechanize_agent)
 
 	 	# Make a new Motionbook instance with our lovely data.
 	 	# Template: Motionbook.new(name, url, author, views, favs, comments)
-	 	# puts "Building the motionbook..."
-	 	# STDIN.gets
-	 	book = Motionbook.new(link.text, link.href, author, views, favs, comments)
+		book = Motionbook.new(link.text, link.href, author, views, favs, comments)
 
-	 	puts "Motionbook built: #{book.name}\n\n"
-
-	 	# use counter to limit number of books for debugging purposes.
-	 	# counter += 1
-
-	 	# update the spinner position for the next run of the loop.
-	 	# if spinner_position == 3
-	 	# 	spinner_position = 0
-	 	# else
-	 	# 	spinner_position += 1
-	 	# end
-
- 	rescue Exception => e
- 		@book_errors_list << link
-	end
+	 	puts "Book #{book.name} processed.\n\n"
+	 rescue Exception: e
+	 	puts "Processing error, #{e.reason}"
+	 	@book_errors_list << link
+	 end
 
 end
 
 
 
-#  Begin script -----------------------------------
+# ----------------------------------- Begin script -----------------------------------
 
 # Set up mechanize agent to get the list of all books.
 @book_list_agent = Mechanize.new
@@ -255,13 +255,9 @@ end
 # List that will contain all the links to the deviations in the motionbooks category.
 @deviation_link_list = []
 @book_errors_list = []
-@finished_book_count = 0
 
 # List of all the running threads, so we can wait for them to finish.
 @threads = []
-
-Thread.abort_on_exception = true
-
 
 
 puts "Motionbooks Stats Reporter"
@@ -284,58 +280,29 @@ puts "Begining Stats parsing..."
 
 sleep 3
 
-# get_deviation_stats
-
 # Handle potential errors.
 unless @deviation_link_list.any?
 	puts "No deviations in list to get stats from, exiting."
 	exit 1		
 end
 
-
+# Spin off threads to process every motionbook link, 30 at a time.
 loop = Thread.new do
 	@deviation_link_list.each_with_index do |link, index|
-		# redo until start_thread(link) == true
-		next if index > 200
+		
 		thread = start_thread(link)
+		# If start_thread returns false, there's too many active threads. Retry til a slot opens up.
 		redo if thread == false
-		# thread.join
-		# puts "Current threads: #{Thread.list}"
-		# puts "Books retrieved so far: #{@finished_book_count}"
 
 	end
 end
 
+
+# Make sure the loop finishes.
 loop.join
 	
-
+# Make sure all motionbook threads finish.
 @threads.each { |t| t.join }
-
-# wait til all threads are finished, give the user something to look at in the meantime.
-
-# ThreadsWait.all_waits(*@threads)
-
-# spinner = ['|', '/', '-', "\\"]
-# spinner_position = 0 
-
-# while Thread.list.count > 1
-	# system 'clear'
-	# print "Working... #{spinner[spinner_position]}\n\n"
-
-	# if spinner_position == 3
-	#     spinner_position = 0
-	# else
-	#     spinner_position += 1
-	# end
-
-	# sleep 0.3
-	# system 'clear'
-	# puts "Current threads: #{Thread.list}"
-	# puts
-	# puts "Books retrieved so far: #{@finished_book_count}"
-	# # puts "Threads array: #{@threads}"
-	# sleep 2
-# end
 
 
 
