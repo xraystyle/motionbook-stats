@@ -1,6 +1,9 @@
 #!/usr/bin/ruby 
 system 'clear'
 
+
+# ----------------- Startup Boilerplate ------------------------
+
 # Check that Mechanize is installed. If not, bail.
 if `gem list | grep mechanize` == ""
 	puts "The 'Mechanize' Rubygem is not currently installed on your system."
@@ -37,10 +40,15 @@ if `gem list | grep mechanize` == ""
 	end
 end
 
+
+# ----------------- End Startup Boilerplate ------------------------
+
+
+
 # Model a Motionbook. Name, URL, stats, etc.
 class Motionbook
 
-# Class methods/variables ------
+	# Class methods/variables ------
 
 	@@motionbooks = []
 
@@ -50,9 +58,9 @@ class Motionbook
 		@@motionbooks
 	
 	end
-# --------------------------------
+	# --------------------------------
 
-# Instance methods/variables -------
+	# Instance methods/variables -------
 
 	attr_reader :name, :url, :author, :views, :favs, :comments
 
@@ -85,7 +93,7 @@ class Motionbook
 		
 	end
 
-# ----------------------------------
+	# ----------------------------------
 
 end
 
@@ -93,51 +101,42 @@ end
 # Useful variables/things that need to be set up.
 require 'mechanize'
 require 'csv'
+require 'open-uri'
 
 # What URL are we using? Default to motionbooks, have ability to pull in a 
 # param for later functionality if necessary.
 ARGV[0] ? @starting_url = ARGV[0] : @starting_url = 'http://www.deviantart.com/motionbooks/?order=9'
 
-# Set up mechanize agent.
-@agent = Mechanize.new
-
-# List that will contain all the links to the deviations in the motionbooks category.
-@deviation_link_list = []
-@book_errors_list = []
-
-
-
-
 
 # Method definitions
 
-# Log into DA so mature deviations can be parsed.
-def login(user = nil, pass = nil)
+# Log into DA so we can get links to mature deviations.
+# They don't show up in the list if you're logged out.
+def login(user, pass, mechanize_agent)
 
-	# check for passed creds. If none, ask.
-	username = user if user
-	password = pass if pass
+	tries = 0
+	begin	
+		homepage = mechanize_agent.get('http://deviantart.com')
 
-	unless user
-		puts "\nEnter valid DA login creds.\n"
+		login_form = homepage.form_with(dom_id: "form-login")
 
-		print "User: "
-		username = STDIN.gets.chomp
-		print "Pass: "
-		password = STDIN.gets.chomp
+		login_form.field_with(dom_id: "login-username").value = user
+		login_form.field_with(dom_id: "login-password").value = pass
+
+		login_form.submit
+	rescue
+		puts "Login error. retrying..."
+		tries += 1
+		if tries < 3
+			sleep (2 ** tries)
+			retry
+		else 
+			puts "Tried three times, bailing."
+		end
 	end
-	
-	homepage = @agent.get('http://deviantart.com')
-
-	login_form = homepage.form_with(dom_id: "form-login")
-
-	login_form.field_with(dom_id: "login-username").value = username
-	login_form.field_with(dom_id: "login-password").value = password
-
-	login_form.submit
-
 
 end
+
 
 # Get all the links to deviations within the motionbooks category.
 def find_deviation_links(base_url, offset = 0)
@@ -167,82 +166,111 @@ def find_deviation_links(base_url, offset = 0)
 	end
 end
 
-# pull the stats from the deviation pages and put together Motionbook instances
-# with the relevant data.
-def get_deviation_stats
+#start a thread that will retrieve data for a motionbook deviation.
+def start_thread(link)
+	
+	if Thread.list.count < 30
 
-	# Handle potential errors.
-	unless @deviation_link_list.any?
-		puts "No deviations in list to get stats from, exiting."
-		exit 1		
-	end
-
-	# Spinners are fun to look at.
-	spinner = ['|', '/', '-', "\\"]
-	spinner_position = 0 
-	# use counter to limit number of books for debugging purposes.
-	# counter = 0
-	@deviation_link_list.each do |link|
-
-		begin
-		 	
-		 	# use counter to limit number of books for debugging purposes.
-			# break if counter == 50
-			system 'clear'
-
-			print "Working... #{spinner[spinner_position]}\n\n"        
-			# empty array to hold the data we want from the 'dd' tags.
-			dd_values = []
-
-			deviation_page = @agent.get(link.href)
-
-			author = deviation_page.link_with(dom_class: %r{u.*username.*}).text
-
-			# find the div that contains the deviation stats.
-			stats_div = deviation_page.search('.dev-metainfo-stats')
-			# Find all the descriptions within the div. This will be the relevant info.
-			dds = stats_div.search('dd')
-
-			# Put the values of the dd tags into an array for cleanup.
-			dds.each do |d|
-		    	dd_values << d.content.chomp.strip
-		 	end
-
-		 	# let's get some nicely formatted data.
-		 	views = dd_values[0].match(/([0-9,]+) ?\(?/)[1].gsub(/,/, "")
-
-		 	favs = dd_values[1].match(/([0-9,]+) ?\(?/)[1].gsub(/,/, "")
-
-		 	comments = dd_values[2].to_s.gsub(/,/, "")
-
-		 	# Make a new Motionbook instance with our lovely data.
-		 	# Template: Motionbook.new(name, url, author, views, favs, comments)
-		 	# puts "Building the motionbook..."
-		 	# STDIN.gets
-		 	book = Motionbook.new(link.text, link.href, author, views, favs, comments)
-
-		 	# use counter to limit number of books for debugging purposes.
-		 	# counter += 1
-
-		 	# update the spinner position for the next run of the loop.
-		 	if spinner_position == 3
-		 		spinner_position = 0
-		 	else
-		 		spinner_position += 1
-		 	end
-
-	 	rescue Exception => e
-	 		@book_errors_list << link
+		t = Thread.new do
+			retrieve_motionbook(link, @agent)
 		end
 
+		@threads << t
+
+		return t
+
+	else
+		return false
 	end
 
 end
 
-#  Begin script -----------------------------------
+
+
+# retrieve the individual motionbook page, use the stats to make a 
+# motionbook instance.
+def retrieve_motionbook(link, mechanize_agent)
+	tries = 0
+	begin
+		dd_values = []
+
+		deviation_page = mechanize_agent.get(link.href)
+
+ 	rescue Exception => e
+ 		
+ 		puts "Error downloading book #{link.text}, retrying..."
+ 		if tries < 5
+ 			sleep (2 ** tries)
+ 			tries +=1
+ 			retry
+ 		else
+ 			puts "Tried three times, giving up."
+ 			@book_errors_list << link
+ 			return
+ 		end
+
+	end
+
+	begin
+		# Process the URL.
+		puts "Book #{link.text} retrieved, processing...\n\n"
+
+		author = deviation_page.link_with(dom_class: %r{u.*username.*}).text
+
+		# find the div that contains the deviation stats.
+		stats_div = deviation_page.search('.dev-metainfo-stats')
+		# Find all the descriptions within the div. This will be the relevant info.
+		dds = stats_div.search('dd')
+
+		# Put the values of the dd tags into an array for cleanup.
+		dds.each do |d|
+	    	dd_values << d.content.chomp.strip
+	 	end
+
+	 	# let's get some nicely formatted data.
+	 	views = dd_values[0].match(/([0-9,]+) ?\(?/)[1].gsub(/,/, "")
+
+	 	favs = dd_values[1].match(/([0-9,]+) ?\(?/)[1].gsub(/,/, "")
+
+	 	comments = dd_values[2].to_s.gsub(/,/, "")
+
+	 	# Make a new Motionbook instance with our lovely data.
+	 	# Template: Motionbook.new(name, url, author, views, favs, comments)
+		book = Motionbook.new(link.text, link.href, author, views, favs, comments)
+
+	 	puts "Book #{book.name} processed.\n\n"
+	 rescue Exception => e
+	 	puts "Processing error, #{e}"
+	 	@book_errors_list << link
+	 end
+
+end
+
+
+
+# ----------------------------------- Begin script -----------------------------------
+
+# Set up mechanize agent.
+@agent = Mechanize.new
+
+# List that will contain all the links to the deviations in the motionbooks category.
+@deviation_link_list = []
+@book_errors_list = []
+
+# List of all the running threads, so we can wait for them to finish.
+@threads = []
+
+
 puts "Motionbooks Stats Reporter"
 
-login
+puts "\nEnter valid DA login creds.\n"
+
+print "User: "
+@username = STDIN.gets.chomp
+print "Pass: "
+@password = STDIN.gets.chomp
+
+login(@username, @password, @agent)
 
 puts "\nFinding all deviations within the category...\n"
 
@@ -253,7 +281,31 @@ puts "Begining Stats parsing..."
 
 sleep 3
 
-get_deviation_stats
+# Handle potential errors.
+unless @deviation_link_list.any?
+	puts "No deviations in list to get stats from, exiting."
+	exit 1		
+end
+
+# Spin off threads to process every motionbook link, 30 at a time.
+loop = Thread.new do
+	@deviation_link_list.each_with_index do |link, index|
+		
+		thread = start_thread(link)
+		# If start_thread returns false, there's too many active threads. Retry til a slot opens up.
+		redo if thread == false
+
+	end
+end
+
+
+# Make sure the loop finishes.
+loop.join
+	
+# Make sure all motionbook threads finish.
+@threads.each { |t| t.join }
+
+
 
 puts "Preparing detailed deviation stats..."
 
