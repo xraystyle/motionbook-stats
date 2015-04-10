@@ -101,6 +101,7 @@ end
 # Useful variables/things that need to be set up.
 require 'mechanize'
 require 'csv'
+require 'open-uri'
 
 # What URL are we using? Default to motionbooks, have ability to pull in a 
 # param for later functionality if necessary.
@@ -109,7 +110,8 @@ ARGV[0] ? @starting_url = ARGV[0] : @starting_url = 'http://www.deviantart.com/m
 
 # Method definitions
 
-# Log into DA so mature deviations can be parsed.
+# Log into DA so we can get links to mature deviations.
+# They don't show up in the list if you're logged out.
 def login(user, pass, mechanize_agent)
 
 	tries = 0
@@ -135,12 +137,13 @@ def login(user, pass, mechanize_agent)
 
 end
 
+
 # Get all the links to deviations within the motionbooks category.
 def find_deviation_links(base_url, offset = 0)
 
 	url = base_url + "&offset=" + offset.to_s
 
-	page = @book_list_agent.get(url)
+	page = @agent.get(url)
 
 	t_links = false
 	# We're looking for links with dom class 't'.
@@ -169,9 +172,7 @@ def start_thread(link)
 	if Thread.list.count < 30
 
 		t = Thread.new do
-			agent = Mechanize.new
-			login(@username, @password, agent)
-			retrieve_motionbook(link, agent)
+			retrieve_motionbook(link, @agent)
 		end
 
 		@threads << t
@@ -197,7 +198,7 @@ def retrieve_motionbook(link, mechanize_agent)
 
  	rescue Exception => e
  		
- 		puts "Error processing book #{link.text}, retrying..."
+ 		puts "Error downloading book #{link.text}, retrying..."
  		if tries < 5
  			sleep (2 ** tries)
  			tries +=1
@@ -238,8 +239,8 @@ def retrieve_motionbook(link, mechanize_agent)
 		book = Motionbook.new(link.text, link.href, author, views, favs, comments)
 
 	 	puts "Book #{book.name} processed.\n\n"
-	 rescue Exception: e
-	 	puts "Processing error, #{e.reason}"
+	 rescue Exception => e
+	 	puts "Processing error, #{e}"
 	 	@book_errors_list << link
 	 end
 
@@ -249,8 +250,8 @@ end
 
 # ----------------------------------- Begin script -----------------------------------
 
-# Set up mechanize agent to get the list of all books.
-@book_list_agent = Mechanize.new
+# Set up mechanize agent.
+@agent = Mechanize.new
 
 # List that will contain all the links to the deviations in the motionbooks category.
 @deviation_link_list = []
@@ -269,7 +270,7 @@ print "User: "
 print "Pass: "
 @password = STDIN.gets.chomp
 
-login(@username, @password, @book_list_agent)
+login(@username, @password, @agent)
 
 puts "\nFinding all deviations within the category...\n"
 
