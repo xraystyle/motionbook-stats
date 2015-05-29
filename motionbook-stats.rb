@@ -251,7 +251,12 @@ end
 # ----------------------------------- Begin script -----------------------------------
 
 # Set up mechanize agent.
-@agent = Mechanize.new
+@agent = Mechanize.new do |a|
+	a.follow_meta_refresh = true
+	a.keep_alive = false
+	a.history.max_size = 10
+end
+
 
 # List that will contain all the links to the deviations in the motionbooks category.
 @deviation_link_list = []
