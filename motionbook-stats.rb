@@ -70,9 +70,9 @@ class Motionbook
   end
 
   # Make a nice array for the CSV output.
-	def make_array
-		[@name, @author, @deviation_url, @views, @favs, @comments]
-	end
+  def make_array
+    [@name, @author, @deviation_url, @views, @favs, @comments]
+  end
 
   # ----------------------------------
 end
