@@ -1,5 +1,7 @@
 DeviantArt Motionbook Stats
 
+2016-07-07: DA changed the site, scraper no longer works. I'm not updating it.
+
 Updated 2015-04-10: Refactored script, it's now threaded. Runs at double the speed of the non-threaded version.
 
 This app is a web scraping exercise done with Ruby and the Mechanize gem. This app will search for all the submissions in the Motionbooks category on DeviantArt, read how many pageviews each has, how many comments, and how many times a user has favorited the work. This data is then compiled on a per-book basis and output as a CSV file on the user's desktop.

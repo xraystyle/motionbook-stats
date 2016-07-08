@@ -80,17 +80,7 @@ class Motionbook
 
 	# Make a nice array for the CSV output.
 	def make_array
-
-		array = []
-		# ["Name", "Author", "URL", "Views", "Favs", "Comments"]
-		array << @name
-		array << @author
-		array << @deviation_url
-		array << @views
-		array << @favs
-		array << @comments
-		return array
-		
+		[@name, @author, @deviation_url, @views, @favs, @comments]
 	end
 
 	# ----------------------------------
